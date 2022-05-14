@@ -107,6 +107,7 @@ export async function run(source : string, config: Config) : Promise<[Value, Glo
     (func $print_num (import "imports" "print_num") (param i32) (result i32))
     (func $print_bool (import "imports" "print_bool") (param i32) (result i32))
     (func $print_str (import "imports" "print_str") (param i32) (result i32))
+    (func $print_enter (import "imports" "print_enter") (param i32) (result i32))
     (func $print_none (import "imports" "print_none") (param i32) (result i32))
     (func $abs (import "imports" "abs") (param i32) (result i32))
     (func $min (import "imports" "min") (param i32) (param i32) (result i32))
@@ -115,15 +116,37 @@ export async function run(source : string, config: Config) : Promise<[Value, Glo
     (func $alloc (import "libmemory" "alloc") (param i32) (result i32))
     (func $load (import "libmemory" "load") (param i32) (param i32) (result i32))
     (func $store (import "libmemory" "store") (param i32) (param i32) (param i32))
+    (func $read_str (param i32) (param i32))
     ${globalImports}
     ${globalDecls}
     ${config.functions}
     ${compiled.functions}
     (func (export "exported_func") ${returnType}
-      (local $i i32)
-      (local $length i32)
       ${compiled.mainSource}
       ${returnExpr}
+    )
+    
+    
+  (func (export "read_str") (param $addr i32) (param $length i32)
+    (local $i i32)
+    (local $$$last i32)
+    (i32.const 1)
+    (local.set $i)
+    (loop $my_loop
+        (local.get $addr)
+        (local.get $i)
+        call $load
+        (call $print_str)
+        (local.set $$$last)
+        (local.get $i)
+        (i32.const 1)
+        (i32.add)
+        (local.set $i)
+        (local.get $i)
+        (local.get $length)
+        (i32.lt_s)
+        br_if $my_loop
+    )
     )
   )`;
   console.log(wasmSource);
