@@ -133,7 +133,12 @@
 
     **Update Week 7**:
 
-    We will look into the escape sequences next week.
+    In chocopy, four escape characters are valid. They are \n, \t, \\ and \". Therefore, we adopt this principle and consider all characters with a leading backslash except these four situations as illegal and will throw a parse error.
+
+    To handle this problem, we change the type of the value of {tag: "str"} in Literal from string to string array because we want to recognize the escape character when parsing the input. So that we can throw an error if coming across parse errors mentioned before. All the escape characters will be thought of as a whole in the array. Then we can easily convert these characters to their ascii code when storing them into memory.
+
+    Same operations are done in ir.ts because this part is ahead of storing characters into memory. We still need this information. That's all for this part.
+
 
 
 7. Throw Error on invalid indexing
@@ -197,17 +202,17 @@
 
     **Update Week 7**:
 
-    We will look into the escape sequences next week.
+    When parsing the input string in traverseLiteral parser.ts, we iterate the string. If the current character is a backslash, we move to the next character. The next character has to be equal to one of the \, ", n, t. Otherwise, we will throw a parse error, including the situation that the backslash is the last character of the input.
 
 ## Changes on AST, IR and builtin libraries
 ### AST
 - We need to add a new Type "string" on the ast. It should be "{tag: "string"}".
-- We need to add a new Literal "string". It should be "{a?:A, tag: "string", value: string}", where a is the annotation for type checking, the value is the string itself. For example, the string "abc"'s literal value is "abc".
+- We need to add a new Literal "string". It should be "{a?:A, tag: "string", value: string[]}", where a is the annotation for type checking, the value is the string being processed into a string array. For example, the string "abc"'s literal value is ["a","b","c"].
 - We need to add a new expression for indexing "{a?: A, tag: "indexing", name: Expr\<A>, index: Expr\<A>}". For example, if we enter "s[0]", the name will be an id expression on the "s" case, the index will be 0. The reason that we need the "index" to be an expression is that we also allow the script like "s[0+1]" to be acceptable.
 
 
 ### IR
-- We need to add a new Value type which is like "{ tag: "string"; value: string; address: number }". The value is the string itself as in ast. The address is where the start of the addresss where the string is stored.
+- We need to add a new Value type which is like "{ tag: "string"; value: string[]; address: number }". The value is the string being processed into a string array as in ast. The address is where the start of the addresss where the string is stored.
 - ISSUE:
 
 ### Builtin libraries
@@ -220,6 +225,7 @@ There will be no completely "new" and "independent" functions that will be added
 - Parser
     - New case "String" on the traverseType
     - New case "String" on the traverseLiteral
+    - **Update Week 7**: on traverseLiteral mentioned above, add operations to process string into a string array 
     - New case "len" on the traverseExpr for CallExpression
     - New condition for MemberExpression on traverseExpr when we are traversing the indexing
     - **Update Week 7**: New special case in traverseExpr -> "MemberExpression": add the index case.
