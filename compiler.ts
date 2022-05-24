@@ -87,14 +87,6 @@ function codeGenStmt(stmt: Stmt<Annotation>, env: GlobalEnv): Array<string> {
         ...codeGenValue(stmt.value, env),
         `call $store`
       ]
-    // To handle how to get the address from a allocate expr  
-    case "store_str":
-      return [
-        ...codeGenValue(stmt.start, env),
-        ...codeGenValue(stmt.offset, env),
-        ...codeGenExpr(stmt.value, env),
-        `call $store`
-      ]
     case "duplicate_str":
       return [
         ...codeGenValue(stmt.source, env),
@@ -196,7 +188,7 @@ function codeGenExpr(expr: Expr<Annotation>, env: GlobalEnv): Array<string> {
       var valStmts = expr.arguments.map((arg) => codeGenValue(arg, env)).flat();
       valStmts.push(`(call $${expr.name})`);
       return valStmts;
-    case "getLength":
+    case "getLengthSum":
       const addr1 = codeGenValue(expr.addr1,env);
       const addr2 = codeGenValue(expr.addr2,env);
       return [...addr1,
@@ -206,11 +198,6 @@ function codeGenExpr(expr: Expr<Annotation>, env: GlobalEnv): Array<string> {
     case "alloc":
       return [
         ...codeGenValue(expr.amount, env),
-        `call $alloc`
-      ];
-    case "alloc_expr":
-      return [
-        ...codeGenExpr(expr.amount, env),
         `call $alloc`
       ];
     case "load":
