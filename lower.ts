@@ -264,7 +264,78 @@ function flattenExprToExpr(e : AST.Expr<Annotation>, env : GlobalEnv) : [Array<I
         ...e,
         expr: val
       }];
+    case "str-concat":
+      var [linits, lstmts, lval] = flattenExprToVal(e.left, env);
+      var [rinits, rstmts, rval] = flattenExprToVal(e.right, env);
+      //load the legnth of left
+      const load_left_length: IR.Expr<Annotation> = {
+        tag: "load",
+        start: lval,
+        offset: { tag: "wasmint", value: 0 }
+      };
+      //load the length of right
+      const load_right_length: IR.Expr<Annotation> = {
+        tag: "load",
+        start: rval,
+        offset: { tag: "wasmint", value: 0 }
+      };
 
+      const alloc_index_string_length : IR.Expr<Annotation> = { tag: "alloc", amount: { tag: "wasmint", value: 1 } };
+      const newIndexStrName = generateName("newStr");
+      const newStringLengthVar = generateName("newStrLength");
+      const newStringLengthVar2 = generateName("newStrLength");
+      const newStringLengthVar3 = generateName("newStrLength");
+
+      const Randomname = generateName("Random");
+      var initsArray: Array<IR.VarInit<Annotation>> = [];
+      var strConcatstmts: IR.Stmt<AST.Annotation>[] = [];
+      initsArray.push({ name: newIndexStrName, type: STRING, value: { tag: "none" } });
+      initsArray.push({ name: newStringLengthVar, type:  NUM, value: { tag: "wasmint", value: 0 } });
+      initsArray.push({ name: newStringLengthVar2, type:  NUM, value: { tag: "wasmint", value: 0 } });
+      initsArray.push({ name: newStringLengthVar3, type:  NUM, value: { tag: "wasmint", value: 0 } });
+
+      initsArray.push({ name: Randomname, type: STRING, value: { tag: "none" } });
+      const getLength: IR.Expr<Annotation>  = {  a:{...e.a, type:NUM}, tag: "getLengthSum", addr1: lval, addr2:rval};
+
+
+      strConcatstmts.push({ tag: "assign", name: newIndexStrName, value: alloc_index_string_length });
+      strConcatstmts.push({ tag: "assign", name: newStringLengthVar, value: getLength });
+      strConcatstmts.push({ tag: "assign", name: newStringLengthVar2, value: load_left_length });
+      strConcatstmts.push({ tag: "assign", name: newStringLengthVar3, value: load_right_length });
+      const alloc_left_string : IR.Expr<Annotation> = { tag: "alloc", amount: { a: {...e.a,type:NUM}, tag: "id", name: newStringLengthVar2 } };
+      const alloc_right_string : IR.Expr<Annotation> = { tag: "alloc", amount: { a: {...e.a,type:NUM}, tag: "id", name: newStringLengthVar3 } };
+      //TODO: store the length of A + B into the newIndexStrName
+      strConcatstmts.push({
+        tag: "store",
+        start: {tag: "id", name: newIndexStrName},
+        offset: {tag:"wasmint", value: 0},
+        value: { a: {...e.a,type:NUM}, tag: "id", name: newStringLengthVar }
+      });
+
+
+
+      //we need to alloc lengthA to randomname
+      strConcatstmts.push({ tag: "assign", name: Randomname, value: alloc_left_string });
+      //TODO: store each character of A into the Randomname
+      strConcatstmts.push({
+        //a: STRING,
+        tag: "duplicate_str",
+        source: lval,
+        dest: {  a: {...e.a,type:STRING}, tag: "id", name: Randomname }
+      });
+      
+      //we need to alloc lengthB to randomname
+      strConcatstmts.push({ tag: "assign", name: Randomname, value: alloc_right_string });
+      //TODO: store each character of B into the Randomname
+      strConcatstmts.push({
+        a: {...e.a, type:STRING},
+        tag: "duplicate_str",
+        source: rval,
+        dest: {  a: {...e.a,type:STRING}, tag: "id", name: Randomname }
+      });
+      return [[...initsArray,...linits,...rinits],
+        [...lstmts,...rstmts,...strConcatstmts],
+        { a: e.a, tag: "value", value: { a: e.a, tag: "id", name: newIndexStrName }}];
     case "binop":
       var [linits, lstmts, lval] = flattenExprToVal(e.left, env);
       var [rinits, rstmts, rval] = flattenExprToVal(e.right, env);
@@ -382,6 +453,67 @@ function flattenExprToExpr(e : AST.Expr<Annotation>, env : GlobalEnv) : [Array<I
           return;
         }
     }
+    case "slice": {
+      if (e.a.type == STRING){
+        console.log("Enter slice")
+        console.log(e)
+        var [indexoinits, indexostmts, indexoval] = flattenExprToVal(e.obj, env);
+        const newIndexStrName = generateName("newStr");
+        const newIndexStrName2 = generateName("newStr");
+        const [_3, _4, leftVal] = flattenExprToVal(e.start, env)
+        const [_5, _6, rightVal] = flattenExprToVal(e.stop, env)
+        const [_7, _8, stepVal] = flattenExprToVal(e.step, env)
+        var index_offset: number = 0;
+        let step = 1
+        if (stepVal.tag == "num") {
+          step = Number(stepVal.value)
+        }
+        console.log("step")
+        console.log(step)
+        var loadStmts: Array<IR.Stmt<Annotation>>  = []
+        if (leftVal.tag == "num" && rightVal.tag == "num") {
+          index_offset = 1
+          for (let i = Number(leftVal.value) + 1; i < Number(rightVal.value) +1; i = i + step) {
+
+            const loadStmt:IR.Expr<Annotation> = {
+              tag: "load",
+              start: indexoval,
+              offset: { tag: "wasmint", value: Number(i) }
+            };
+            loadStmts.push({ tag: "assign", name: newIndexStrName2, value: loadStmt})
+            loadStmts.push({
+              tag: "store",
+              start: {tag: "id", name: newIndexStrName},
+              offset: {tag:"wasmint", value: index_offset},
+              value: { a: {...e.a,type:NUM}, tag: "id", name: newIndexStrName2 }
+            });
+            index_offset += 1
+          }
+        }
+        let alloc_index_string : IR.Expr<Annotation>
+        if (leftVal.tag == "num" && rightVal.tag == "num") {
+          alloc_index_string = { tag: "alloc", amount: { tag: "wasmint", value: index_offset } };
+        }
+
+        var assigns_index_string : IR.Stmt<Annotation>[] = [];
+        if (leftVal.tag == "num" && rightVal.tag == "num") {
+        assigns_index_string.push({
+          tag: "store",
+          start: {tag: "id", name: newIndexStrName},
+          offset: {tag:"wasmint", value: 0},
+          value: {a:{...e.a,type:NUM} , tag:"wasmint", value:index_offset-1}
+        });
+        }
+
+        indexoinits.push({ name: newIndexStrName, type: STRING, value: { tag: "none" } });
+        indexoinits.push({ name: newIndexStrName2, type: NUM, value:{tag:"wasmint",value:0} });
+        return [indexoinits,
+          [...indexostmts, { tag: "assign", name: newIndexStrName, value: alloc_index_string },...loadStmts, ...assigns_index_string],
+          {  tag: "value", value: { a: e.a, tag: "id", name: newIndexStrName } }];
+      }else{//This is for other group like lists/dictionary/sets/tuples
+        return;
+      }
+    }
     case "construct":
       const classdata = env.classes.get(e.name);
       const fields = [...classdata.entries()];
@@ -467,7 +599,7 @@ function flattenExprToExpr(e : AST.Expr<Annotation>, env : GlobalEnv) : [Array<I
           value: {a:{...e.a,type:NUM} , tag:"wasmint", value:strLength}
         });
         const strArr = parseString(v.value)
-        for (var i=1; i<=strLength;i++){
+        for (let i = 1; i<=strLength; i++){
           const ascii = strArr[i-1]
           assigns_string.push({
             tag: "store",
